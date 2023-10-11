@@ -7,9 +7,10 @@ const adminAuth = require("../middlewares/adminAuth");
 const { ObjectId } = require("mongodb");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const teacherSchema = require("../models/teacher");
+const staffSchema = require("../models/staff");
+const roomSchema = require("../models/room");
 const staffAuth = require("../middlewares/staffAuth");
-const webpush = require("web-push");
+// const webpush = require("web-push");
 // router.post("/subtest", async (req, res) => {
 //   const publicKey =
 //     "BAk5I2kthzXPoK38SivOCeKaqIPf8weSOcfsqdJasESoj0Zt3H7uENee95KSSBOC1qBGw4UK_xiE4nKrZWHyEtw";
@@ -50,24 +51,53 @@ router.post("/login", async (req, res) => {
   return res.send(token);
 });
 
+// router.post("/sign-up", adminAuth, async (req, res) => {
+//   const r = validate(teacherSchema, req.body, res);
+//   if (r) return;
+//   const { firstName, lastName, phoneNumber, password } = req.body;
+//   user = await db.findOne("staff", {
+//     $or: [{ phoneNumber }, { studentCode }],
+//   });
+//   if (user) return res.status(409).send("دانشجو قبلا ثبت شده");
+//   encryptedPass = await bcrypt.hash(password, 10);
+//   const result = await db.insertOne("staff", {
+//     firstName,
+//     lastName,
+//     studentCode,
+//     phoneNumber,
+//     password: encryptedPass,
+//     codeTime: new Date(),
+//     code: generateRandomCode(4).toString(),
+//   });
+//   res.send(result);
+// });
+
 router.post("/sign-up", adminAuth, async (req, res) => {
-  const r = validate(teacherSchema, req.body, res);
+  const r = validate(staffSchema, req.body, res);
   if (r) return;
-  const { firstName, lastName, phoneNumber, password } = req.body;
-  user = await db.findOne("staff", {
-    $or: [{ phoneNumber }, { studentCode }],
-  });
-  if (user) return res.status(409).send("دانشجو قبلا ثبت شده");
+  const { firstName, lastName, phoneNumber, password, isAdmin } = req.body;
+  user = await db.findOne("staff", { phoneNumber });
+  if (user) return res.status(409).send("شماره تلفن تکراری است");
   encryptedPass = await bcrypt.hash(password, 10);
   const result = await db.insertOne("staff", {
-    firstName,
-    lastName,
-    studentCode,
+    firstName: firstName.trim(),
+    lastName: lastName.trim(),
     phoneNumber,
     password: encryptedPass,
+    isAdmin,
     codeTime: new Date(),
     code: generateRandomCode(4).toString(),
   });
+  res.send(result);
+});
+router.get("/staff", adminAuth, async (req, res) => {
+  const { firstName, lastName } = req.query;
+  const result = await (
+    await db.find("staff", {
+      firstName: { $regex: new RegExp(firstName, "i") },
+      lastName: { $regex: new RegExp(lastName, "i") },
+    })
+  ).toArray();
   res.send(result);
 });
 
@@ -101,6 +131,54 @@ router.get("/rooms", staffAuth, async (req, res) => {
     .toArray();
 
   return res.send(results);
+});
+router.get("/room/:id", adminAuth, async (req, res) => {
+  const results = await db
+    .getCollection("queue", "staffRooms")
+    .aggregate([
+      {
+        $match: {
+          staffId: new ObjectId(req.params.id),
+        },
+      },
+      {
+        $lookup: {
+          from: "rooms",
+          localField: "roomId",
+          foreignField: "_id",
+          as: "roomDetails",
+        },
+      },
+      {
+        $unwind: "$roomDetails",
+      },
+      {
+        $project: {
+          staffId: 1,
+          roomDetails: 1,
+        },
+      },
+    ])
+    .toArray();
+
+  return res.send(results);
+});
+router.post("/room", adminAuth, async (req, res) => {
+  const r = validate(roomSchema, req.body, res);
+  if (r) return;
+  const { title, staffId, floor, desc } = req.body;
+  const newRoom = await db.insertOne("rooms", {
+    isWorking: false,
+    queue: [],
+    title,
+    floor: parseInt(floor),
+    desc,
+  });
+  await db.insertOne("staffRooms", {
+    staffId: new ObjectId(staffId),
+    roomId: new ObjectId(newRoom.insertedId),
+  });
+  res.send("اتاق با موفقیت ثبت شد");
 });
 router.post("/make-form", adminAuth, async (req, res) => {
   let { head, questions } = req.body;

@@ -55,8 +55,8 @@ router.post("/sign-up", async (req, res) => {
     return res.status(409).send("شماره تلفن یا شماره دانشجویی تکراری است");
   encryptedPass = await bcrypt.hash(password, 10);
   const result = await db.insertOne("students", {
-    firstName,
-    lastName,
+    firstName: firstName.trim(),
+    lastName: lastName.trim(),
     studentCode,
     phoneNumber,
     password: encryptedPass,
