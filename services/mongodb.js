@@ -17,7 +17,7 @@ module.exports = class DB {
     try {
       await this.client.connect();
       await this.client.db("queue").command({ ping: 1 });
-      console.log("connected to mongodb service");
+      console.log("connected to mongodb service ");
     } catch (error) {
       console.log(error);
       if (this.client) await this.client.close();
