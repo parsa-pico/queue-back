@@ -16,9 +16,11 @@ module.exports = class DB {
   static async connect() {
     try {
       await this.client.connect();
-      console.log("connected to mongodb");
+      await this.client.db("queue").command({ ping: 1 });
+      console.log("connected to mongodb service");
     } catch (error) {
       console.log(error);
+      if (this.client) await this.client.close();
     }
   }
   static getCollection(db = dataBase, collection) {
