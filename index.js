@@ -8,4 +8,4 @@ const app = require("express")();
 server = require("./startup/routes")(app);
 
 const port = process.env.PORT || 3000;
-server.listen(port, () => console.log("listening on port " + port));
+server.listen(port, () => console.log("listening  on port " + port));
